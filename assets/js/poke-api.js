@@ -1,35 +1,36 @@
+export let proxima = '';
 
-const pokeApi = {}
+export async function PoKeDataNext(val) {
+    try {
+        const response = await fetch(`${val}`);
+        if (!response.ok) {
+            throw new Error('API request failed');
+        }
+        const data = await response.json();
 
-function convertPokeApiDetailToPokemon(pokeDetail) {
-    const pokemon = new Pokemon()
-    pokemon.number = pokeDetail.id
-    pokemon.name = pokeDetail.name
+        proxima = data.next; // Atualiza o link da próxima página
 
-    const types = pokeDetail.types.map((typeSlot) => typeSlot.type.name)
-    const [type] = types
+        const promises = data.results.map(async (elem) => {
+            const fotoPoke = await fetch(elem.url);
+            if (!fotoPoke.ok) {
+                throw new Error('API request failed');
+            }
+            const fotoPokeDados = await fotoPoke.json();
 
-    pokemon.types = types
-    pokemon.type = type
+            if (fotoPokeDados.sprites.other.dream_world.front_default) {
+                return {
+                    id: fotoPokeDados.id,
+                    nome: fotoPokeDados.name,
+                    foto: fotoPokeDados.sprites.other.dream_world.front_default,
+                    types: fotoPokeDados.types.map(typeInfo => typeInfo.type.name)
+                };
+            }
+        });
 
-    pokemon.photo = pokeDetail.sprites.other.dream_world.front_default
+        const pokemons = await Promise.all(promises);
+        return pokemons
 
-    return pokemon
-}
-
-pokeApi.getPokemonDetail = (pokemon) => {
-    return fetch(pokemon.url)
-        .then((response) => response.json())
-        .then(convertPokeApiDetailToPokemon)
-}
-
-pokeApi.getPokemons = (offset = 0, limit = 5) => {
-    const url = `https://pokeapi.co/api/v2/pokemon?offset=${offset}&limit=${limit}`
-
-    return fetch(url)
-        .then((response) => response.json())
-        .then((jsonBody) => jsonBody.results)
-        .then((pokemons) => pokemons.map(pokeApi.getPokemonDetail))
-        .then((detailRequests) => Promise.all(detailRequests))
-        .then((pokemonsDetails) => pokemonsDetails)
+    } catch (error) {
+        console.error('Erro:', error);
+    }
 }
